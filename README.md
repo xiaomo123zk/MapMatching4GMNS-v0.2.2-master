@@ -3,9 +3,11 @@ Tang, J., Song, Y., Miller, H.J. and Zhou, X., 2016. Estimating the most likely 
 You can find the pre-print paper in doc.
 
 
-![Illustration of space-time path and network-time prism](doc/img/prism.png)
+Space-time path and network-time prism
+![network-time prism](doc/img/prism.png)
 
-![6 GPS points on a 3-node network based on three-dimensional network](doc/img/3dprism.png)
+6 GPS points on a 3-node network based on three-dimensional network
+![network](doc/img/3dprism.png)
 
 #What is GMNS?
 General Travel Network Format Specification is a product of Zephyr Foundation, which aims to advance the field through flexible and efficient support, education, guidance, encouragement, and incubation.
