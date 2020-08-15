@@ -4,10 +4,10 @@ You can find the pre-print paper in doc.
 
 
 Space-time path and network-time prism
-![network-time prism](doc/img/prism.png)
+![network-time prism](doc/img/prism.PNG)
 
 6 GPS points on a 3-node network based on three-dimensional network
-![network](doc/img/3dprism.png)
+![network](doc/img/3dprism.PNG)
 
 #What is GMNS?
 General Travel Network Format Specification is a product of Zephyr Foundation, which aims to advance the field through flexible and efficient support, education, guidance, encouragement, and incubation.
