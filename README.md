@@ -1,7 +1,8 @@
-This code is implemented based on a published paper in Journal of Transportation Research Part C:
-Tang, J., Song, Y., Miller, H.J. and Zhou, X., 2016. Estimating the most likely space–time paths, dwell times and path uncertainties from vehicle trajectory data: A time geographic method. Transportation Research Part C: Emerging Technologies, 66, pp.176-194.
-You can find the pre-print paper in doc.
+This source code is implemented using the concept of space-time paths and a time geographic method.
 
+Published journal paper: 
+Tang, J., Song, Y., Miller, H.J. and Zhou, X., 2016. Estimating the most likely space–time paths, dwell times and path uncertainties from vehicle trajectory data: A time geographic method. Transportation Research Part C: Emerging Technologies, 66, pp.176-194.
+You can find the pre-print version of this paper in doc.
 
 Space-time path and network-time prism
 ![network-time prism](doc/img/prism.PNG)
