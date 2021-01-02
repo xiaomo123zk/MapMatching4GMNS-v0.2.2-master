@@ -51,6 +51,7 @@ public:
 
 	int link_id;
 	string name;
+	string geometry;
 	int from_node_id;
 	int to_node_id;
 
@@ -385,7 +386,7 @@ public:
 						
 						double distance_from = g_GetPoint2LineDistance(m_GridMatrix[x_i][y_i].m_o_boundary_point[0],
 							g_node_vector[g_link_vector[l].from_node_seq_no].pt, g_node_vector[g_link_vector[l].to_node_seq_no].pt,
-							1, true);
+							1, false);
 
 						double distance_to = 0;
 
@@ -393,13 +394,11 @@ public:
 						{
 							distance_to = g_GetPoint2LineDistance(m_GridMatrix[x_i][y_i].m_o_boundary_point[1],
 								g_node_vector[g_link_vector[l].from_node_seq_no].pt, g_node_vector[g_link_vector[l].to_node_seq_no].pt,
-								1, true);
+								1, false);
 						}
 
 						double distance_from_p2p = g_GetPoint2Point_Distance(m_GridMatrix[x_i][y_i].m_o_boundary_point[0] , g_node_vector[g_link_vector[l].from_node_seq_no].pt);
 						double distance_to_p2p = g_GetPoint2Point_Distance(m_GridMatrix[x_i][y_i].m_o_boundary_point[0] , g_node_vector[g_link_vector[l].to_node_seq_no].pt);
-						
-
 
 						double distance = (distance_from + distance_to + distance_from_p2p + distance_to_p2p) / 4;
 						
@@ -436,12 +435,17 @@ public:
 
 						double distance_from = g_GetPoint2LineDistance(m_GridMatrix[x_i][y_i].m_d_boundary_point[0],
 							g_node_vector[g_link_vector[l].from_node_seq_no].pt, g_node_vector[g_link_vector[l].to_node_seq_no].pt,
-							1, true);
-						double distance_to = g_GetPoint2LineDistance(m_GridMatrix[x_i][y_i].m_d_boundary_point[1],
+							1, false);
+						double distance_to = 0;
+						
+						distance_to = g_GetPoint2LineDistance(m_GridMatrix[x_i][y_i].m_d_boundary_point[1],
 							g_node_vector[g_link_vector[l].from_node_seq_no].pt, g_node_vector[g_link_vector[l].to_node_seq_no].pt,
-							1, true);
+							1, false);
 
-						double distance = (distance_from + distance_to ) / 4;
+						double distance_from_p2p = g_GetPoint2Point_Distance(m_GridMatrix[x_i][y_i].m_d_boundary_point[0], g_node_vector[g_link_vector[l].from_node_seq_no].pt);
+						double distance_to_p2p = g_GetPoint2Point_Distance(m_GridMatrix[x_i][y_i].m_d_boundary_point[0], g_node_vector[g_link_vector[l].to_node_seq_no].pt);
+
+						double distance = (distance_from + distance_to + distance_from_p2p + distance_to_p2p) / 4;
 						if (distance < min_distance_to_boundary_point)
 						{
 							min_distance_to_boundary_point = distance;
@@ -880,12 +884,12 @@ void g_ReadInputData()
 			if (parser_link.GetValueByFieldName("to_node_id", link.to_node_id) == false)
 				continue;
 
-			int allowed_uses = 0;
+			int allowed_uses = -1;
 			parser_link.GetValueByFieldName("allowed_uses", allowed_uses, false);
 
-				if (allowed_uses != 1)
-					continue;
 
+				if (allowed_uses != 1)  // not allowed, skip this link in map matching process 
+					continue;
 
 			if (g_internal_node_seq_no_map.find(link.from_node_id) == g_internal_node_seq_no_map.end())
 			{
@@ -898,8 +902,13 @@ void g_ReadInputData()
 				continue;
 			}
 
+			string geometry;
+			parser_link.GetValueByFieldName("geometry", geometry);
+
+
 			link.from_node_seq_no = g_internal_node_seq_no_map[link.from_node_id];
 			link.to_node_seq_no = g_internal_node_seq_no_map[link.to_node_id];
+			link.geometry = geometry;
 			link.link_seq_no = g_number_of_links++;
 
 			g_internal_link_no_map[link.link_id] = link.link_seq_no;
@@ -981,7 +990,6 @@ int g_number_of_CPU_threads()
 }
 
 
-
 NetworkForSP* g_pNetworkVector = NULL;
 #pragma warning(disable : 4996)
 
@@ -1032,31 +1040,26 @@ void g_OutputAgentCSVFile()
 
 			fprintf(g_pFileAgent, ",");
 
-			fprintf(g_pFileAgent, "\"LINESTRING (");
 
-			if (p_agent->m_node_size > 1)
+			if (p_agent->m_node_size > 1)  // with feasible path
 			{
-			
+				fprintf(g_pFileAgent, "\"LINESTRING (");
+
 				for (int i = 0; i < p_agent->m_node_size; i++)
 				{
 					fprintf(g_pFileAgent, "%f %f,", g_node_vector[p_agent->path_node_vector[i]].pt.x, g_node_vector[p_agent->path_node_vector[i]].pt.y);
 				}
+				fprintf(g_pFileAgent, ")\"");
+
 			}
 			else 
 			{
 				if (p_agent->matching_link_no >= 0)
 				{
-					fprintf(g_pFileAgent, "%f %f,", g_node_vector[g_link_vector[p_agent->matching_link_no].from_node_seq_no].pt.x,
-						g_node_vector[g_link_vector[p_agent->matching_link_no].from_node_seq_no].pt.y);
-
-					fprintf(g_pFileAgent, "%f %f", g_node_vector[g_link_vector[p_agent->matching_link_no].to_node_seq_no].pt.x,
-						g_node_vector[g_link_vector[p_agent->matching_link_no].to_node_seq_no].pt.y);
-
+					fprintf(g_pFileAgent, "\"%s\",", g_link_vector[p_agent->matching_link_no].geometry.c_str());
 				}
 			}
 
-
-			fprintf(g_pFileAgent, ")\"");
 
 			fprintf(g_pFileAgent, "\n");
 		}
