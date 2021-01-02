@@ -23,7 +23,7 @@ int g_grid_size = 1;
 
 std::map<int, int> g_internal_node_seq_no_map;
 std::map<int, int> g_internal_link_no_map;
-std::map<int, int> g_internal_agent_no_map;
+std::map<string, int> g_internal_agent_no_map;
 
 
 extern void g_Program_stop();
@@ -123,7 +123,8 @@ public:
 
 	int origin_cell_flag;  
 	int destination_cell_flag;
-	GDPoint m_boundary_point;
+	GDPoint m_o_boundary_point[2];  // from point and to point
+	GDPoint m_d_boundary_point[2];
 
 };
 class CAgent
@@ -131,13 +132,15 @@ class CAgent
 public:
 	CAgent()
 	{
+		matching_link_no = -1;
 	}
 
-	int agent_id;
+	string agent_id;
 	int agent_no;
 
 	int o_node_id;
 	int d_node_id;
+	int matching_link_no;
 	int origin_node_seq_no;
 	int destination_node_seq_no;
 	int origin_zone_id;
@@ -186,7 +189,8 @@ public:
 	{
 
 		m_GridMatrix = Allocate2DDynamicArray<GridNodeSet>(_MAX_GRID_SIZE, _MAX_GRID_SIZE);
-		g_grid_size = min(_MAX_GRID_SIZE, g_node_vector.size() / 100);  // dynamically determine the size of grid. e.g. for a testing network <100 nodes, use a grid size of 1.
+		g_grid_size = min(_MAX_GRID_SIZE, g_node_vector.size() / 1000);  // dynamically determine the size of grid. e.g. for a testing network <100 nodes, use a grid size of 1.
+        // g_grid_size is the number of cells horizonatally or virtically
 		cout << "grid size = " << g_grid_size << endl;
 
 		// initialization of grid rectangle boundary
@@ -216,7 +220,7 @@ public:
 			int x_key = (g_node_vector[i].pt.x - m_left) / m_GridXStep;  // x_key internal x horizonal index of grid 
 			int y_key = (g_node_vector[i].pt.y - m_bottom) / m_GridYStep;
 
-			//feasible region
+			//feasible region in case of out of bound 
 			x_key = max(0, x_key);
 			x_key = min(g_grid_size - 1, x_key);
 
@@ -289,6 +293,7 @@ public:
 		}
 		// put GPS points into grid cell
 
+
 		for (int g = 0; g < g_agent_vector[agent_no].m_GPSPointVector.size(); g++)  // for each GPS point
 		{ // x_key and y_key are relative index of grid
 			int x_key = (g_agent_vector[agent_no].m_GPSPointVector[g].pt.x - m_left) / m_GridXStep;
@@ -308,13 +313,19 @@ public:
 			{
 
 				m_GridMatrix[x_key][y_key].origin_cell_flag = true;
-				m_GridMatrix[x_key][y_key].m_boundary_point = g_agent_vector[agent_no].m_GPSPointVector[g].pt;
+				m_GridMatrix[x_key][y_key].m_o_boundary_point[0] = g_agent_vector[agent_no].m_GPSPointVector[g].pt;
+				
+				if(g_agent_vector[agent_no].m_GPSPointVector.size()>=2)
+				{
+				m_GridMatrix[x_key][y_key].m_o_boundary_point[1] = g_agent_vector[agent_no].m_GPSPointVector[g+1].pt;
+				}
 			}
-			else if (g == g_agent_vector[agent_no].m_GPSPointVector.size() - 1)  //ending GPS point to find the d_node 
+			else if (g == g_agent_vector[agent_no].m_GPSPointVector.size() - 1 && (g_agent_vector[agent_no].m_GPSPointVector.size() >= 2))  //ending GPS point to find the d_node 
 			{
 
 				m_GridMatrix[x_key][y_key].destination_cell_flag = true;
-				m_GridMatrix[x_key][y_key].m_boundary_point = g_agent_vector[agent_no].m_GPSPointVector[g].pt;
+				m_GridMatrix[x_key][y_key].m_d_boundary_point[0] = g_agent_vector[agent_no].m_GPSPointVector[g - 1].pt;
+				m_GridMatrix[x_key][y_key].m_d_boundary_point[1] = g_agent_vector[agent_no].m_GPSPointVector[g].pt;
 
 			}
 
@@ -344,7 +355,12 @@ public:
 						int l = m_GridMatrix[x_i][y_i].m_LinkNoVector[local_l];
 
 						double distance_from = g_GetPoint2Point_Distance(m_GridMatrix[x_i][y_i].m_GPSPointVector[g].pt, g_node_vector[g_link_vector[l].from_node_seq_no].pt);
-						double distance_to = g_GetPoint2Point_Distance(m_GridMatrix[x_i][y_i].m_GPSPointVector[g+1].pt, g_node_vector[g_link_vector[l].to_node_seq_no].pt);
+						double distance_to = 0;
+						
+						if(g_agent_vector[agent_no].m_GPSPointVector.size() >= 2)
+						{ 
+							distance_to = g_GetPoint2Point_Distance(m_GridMatrix[x_i][y_i].m_GPSPointVector[g + 1].pt, g_node_vector[g_link_vector[l].to_node_seq_no].pt);
+						}
 
 						// distance from is the distance from GPS point g to from node of link
 						// distance to is the distance from GPS point g to to node of link
@@ -365,13 +381,48 @@ public:
 					{
 						int l = m_GridMatrix[x_i][y_i].m_LinkNoVector[local_l];
 
-						double distance_from = g_GetPoint2Point_Distance(m_GridMatrix[x_i][y_i].m_boundary_point,
-							g_node_vector[g_link_vector[l].from_node_seq_no].pt);
-							
-						if (distance_from < min_distance_to_boundary_point)
+						
+						
+						double distance_from = g_GetPoint2LineDistance(m_GridMatrix[x_i][y_i].m_o_boundary_point[0],
+							g_node_vector[g_link_vector[l].from_node_seq_no].pt, g_node_vector[g_link_vector[l].to_node_seq_no].pt,
+							1, true);
+
+						double distance_to = 0;
+
+						if (g_agent_vector[agent_no].m_GPSPointVector.size() >= 2)
 						{
-							min_distance_to_boundary_point = distance_from;
+							distance_to = g_GetPoint2LineDistance(m_GridMatrix[x_i][y_i].m_o_boundary_point[1],
+								g_node_vector[g_link_vector[l].from_node_seq_no].pt, g_node_vector[g_link_vector[l].to_node_seq_no].pt,
+								1, true);
+						}
+
+						double distance_from_p2p = g_GetPoint2Point_Distance(m_GridMatrix[x_i][y_i].m_o_boundary_point[0] , g_node_vector[g_link_vector[l].from_node_seq_no].pt);
+						double distance_to_p2p = g_GetPoint2Point_Distance(m_GridMatrix[x_i][y_i].m_o_boundary_point[0] , g_node_vector[g_link_vector[l].to_node_seq_no].pt);
+						
+
+
+						double distance = (distance_from + distance_to + distance_from_p2p + distance_to_p2p) / 4;
+						
+						int i_trace = 0;
+
+		/*				if (g_link_vector[l].from_node_id == 7280 && g_link_vector[l].to_node_id)
+						{
+							i_trace = 1;
+						}
+
+
+						if (g_link_vector[l].from_node_id == 727 && g_link_vector[l].to_node_id == 5724)
+						{
+							i_trace = 1;
+						}*/
+
+						if (distance < min_distance_to_boundary_point)
+						{
+
+							min_distance_to_boundary_point = distance;
 							origin_node_no = g_link_vector[l].from_node_seq_no;
+							g_agent_vector[agent_no].matching_link_no = l;
+
 						}
 					}
 				}
@@ -383,12 +434,17 @@ public:
 					{
 						int l = m_GridMatrix[x_i][y_i].m_LinkNoVector[local_l];
 
-						double distance_to = g_GetPoint2Point_Distance(m_GridMatrix[x_i][y_i].m_boundary_point,
-							g_node_vector[g_link_vector[l].to_node_seq_no].pt);
+						double distance_from = g_GetPoint2LineDistance(m_GridMatrix[x_i][y_i].m_d_boundary_point[0],
+							g_node_vector[g_link_vector[l].from_node_seq_no].pt, g_node_vector[g_link_vector[l].to_node_seq_no].pt,
+							1, true);
+						double distance_to = g_GetPoint2LineDistance(m_GridMatrix[x_i][y_i].m_d_boundary_point[1],
+							g_node_vector[g_link_vector[l].from_node_seq_no].pt, g_node_vector[g_link_vector[l].to_node_seq_no].pt,
+							1, true);
 
-						if (distance_to < min_distance_to_boundary_point)
+						double distance = (distance_from + distance_to ) / 4;
+						if (distance < min_distance_to_boundary_point)
 						{
-							min_distance_to_boundary_point = distance_to;
+							min_distance_to_boundary_point = distance;
 							destination_node_no = g_link_vector[l].to_node_seq_no;
 						}
 					}
@@ -689,7 +745,7 @@ public:
 		{
 			CAgent* p_agent = &(g_agent_vector[m_agent_vector[i]]);
 
-			cout << "agent_id =" << p_agent->agent_id << endl;
+			cout << "agent_id =" << p_agent->agent_id.c_str() << endl;
 
 			return_value = optimal_label_correcting(p_agent->agent_no);
 			if (return_value == -1)
@@ -717,8 +773,12 @@ public:
 			}
 
 			p_agent->AllocatePathNodeVector(l_node_size, temp_path_node_vector);
+			if(origin_node_no>=0 && destination_node_no>=0)  //feasible origin and destination nodes
+			{
 			p_agent->o_node_id = g_node_vector[origin_node_no].node_id;
+
 			p_agent->d_node_id = g_node_vector[destination_node_no].node_id;
+			}
 
 		}
 
@@ -740,13 +800,14 @@ void g_Program_stop()
 
 int timestr2second(string time_str)
 {
-	string hh = time_str.substr(0, 2);
-	string mm = time_str.substr(2, 2);
-	string ss = time_str.substr(5, 2);
-	int hhi = stoi(hh);
-	int mmi = stoi(mm);
-	int ssi = stoi(ss);
-	return hhi * 3600 + mmi * 60 + ssi;
+	//string hh = time_str.substr(0, 2);
+	//string mm = time_str.substr(2, 2);
+	//string ss = time_str.substr(5, 2);
+	//int hhi = stoi(hh);
+	//int mmi = stoi(mm);
+	//int ssi = stoi(ss);
+	//return hhi * 3600 + mmi * 60 + ssi;
+	return 0;
 }
 
 
@@ -819,6 +880,13 @@ void g_ReadInputData()
 			if (parser_link.GetValueByFieldName("to_node_id", link.to_node_id) == false)
 				continue;
 
+			int allowed_uses = 0;
+			parser_link.GetValueByFieldName("allowed_uses", allowed_uses, false);
+
+				if (allowed_uses != 1)
+					continue;
+
+
 			if (g_internal_node_seq_no_map.find(link.from_node_id) == g_internal_node_seq_no_map.end())
 			{
 				cout << "warning: from_node_id " << link.from_node_id << " of link " << link.link_id << " has not been defined in node.csv\n";
@@ -853,14 +921,14 @@ void g_ReadInputData()
 
 	CCSVParser gps_parser;
 	int gps_point_count = 0;
-	if (gps_parser.OpenCSVFile("trajectory.csv", true))
+	if (gps_parser.OpenCSVFile("trace.csv", true))
 	{
 		double x, y;
 		string time_stamp;
 		int time_in_second;
 		while (gps_parser.ReadRecord())
 		{
-			int agent_id = 0;
+			string agent_id;
 			if (gps_parser.GetValueByFieldName("agent_id", agent_id) == false)
 				continue;
 
@@ -896,7 +964,7 @@ void g_ReadInputData()
 	}
 	else
 	{
-		cout << "Cannot open file trajectory.csv" << endl;
+		cout << "Cannot open file trace.csv" << endl;
 		g_Program_stop();
 	}
 
@@ -929,18 +997,32 @@ void g_OutputAgentCSVFile()
 	}
 	else
 	{
-		fprintf(g_pFileAgent, "agent_id,o_node_id,d_node_id,o_zone_id,d_zone_id,node_sequence,geometry,time_sequence\n");
+		fprintf(g_pFileAgent, "agent_id,o_node_id,d_node_id,o_zone_id,d_zone_id,matching_link_from_node_id,matching_link_to_node_id,matching_link_id,node_sequence,geometry,time_sequence\n");
 
 		for (int a = 0; a < g_agent_vector.size(); a++)
 		{
 			CAgent* p_agent = &(g_agent_vector[a]);
+			int matching_link_from_node_id = -1;
+			int matching_link_to_node_id = -1;
+			int matching_link_id = -1;
 
-			fprintf(g_pFileAgent, "%d,%d,%d,%d,%d,",
-				p_agent->agent_id,
+			if (p_agent->matching_link_no >= 0)
+			{
+				matching_link_from_node_id = g_link_vector[p_agent->matching_link_no].from_node_id;
+				matching_link_to_node_id = g_link_vector[p_agent->matching_link_no].to_node_id;
+				matching_link_id = g_link_vector[p_agent->matching_link_no].link_id;
+			}
+
+			fprintf(g_pFileAgent, "%s,%d,%d,%d,%d,%d,%d,%d,",
+				p_agent->agent_id.c_str(),
 				p_agent->o_node_id,
 				p_agent->d_node_id,
 				p_agent->origin_zone_id,
-				p_agent->destination_zone_id
+				p_agent->destination_zone_id,
+				matching_link_from_node_id,
+				matching_link_to_node_id,
+				matching_link_id
+
 			);
 
 			for (int i = 0; i < p_agent->m_node_size; i++)
@@ -952,12 +1034,25 @@ void g_OutputAgentCSVFile()
 
 			fprintf(g_pFileAgent, "\"LINESTRING (");
 
-			for (int i = 0; i < p_agent->m_node_size; i++)
+			if (p_agent->m_node_size > 1)
 			{
-				fprintf(g_pFileAgent, "%f %f", g_node_vector[p_agent->path_node_vector[i]].pt.x , g_node_vector[p_agent->path_node_vector[i]].pt.y);
+			
+				for (int i = 0; i < p_agent->m_node_size; i++)
+				{
+					fprintf(g_pFileAgent, "%f %f,", g_node_vector[p_agent->path_node_vector[i]].pt.x, g_node_vector[p_agent->path_node_vector[i]].pt.y);
+				}
+			}
+			else 
+			{
+				if (p_agent->matching_link_no >= 0)
+				{
+					fprintf(g_pFileAgent, "%f %f,", g_node_vector[g_link_vector[p_agent->matching_link_no].from_node_seq_no].pt.x,
+						g_node_vector[g_link_vector[p_agent->matching_link_no].from_node_seq_no].pt.y);
 
-				if (i != p_agent->m_node_size - 1)
-					fprintf(g_pFileAgent, ", ");
+					fprintf(g_pFileAgent, "%f %f", g_node_vector[g_link_vector[p_agent->matching_link_no].to_node_seq_no].pt.x,
+						g_node_vector[g_link_vector[p_agent->matching_link_no].to_node_seq_no].pt.y);
+
+				}
 			}
 
 
