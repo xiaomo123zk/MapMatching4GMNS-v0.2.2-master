@@ -14,7 +14,7 @@ import collections
 import heapq
 import os.path
 from sys import platform
-
+import shutil
 
 print("To avoid complex data folder settings, please always first put the input data on the current directory.")
 print('call MapMatching4GMNS  dynamic library')
@@ -45,13 +45,28 @@ def _optimal_MapMatching4GMNS_CAPI(mode):
     print('\MapMatching4GMNS run completes')
 
 
-# if __name__ == "__main__":
-#     mode = 1
+if __name__ == "__main__":
+    # put the input data to current path
 
-#     import time
-#     start = time.time()
-#     _optimal_MapMatching4GMNS_CAPI(mode)
-#     end = time.time()
+    src = './dataset/node.csv'
+    dst = './'
+    shutil.copy(src, dst)
+    src = './dataset/link.csv'
+    dst = './'
+    shutil.copy(src, dst)
+    src = './dataset/trace.csv'
+    dst = './'
+    shutil.copy(src, dst)
+    src = './dataset/input_agent.csv'
+    dst = './'
+    shutil.copy(src, dst)
 
-#     print('MapMatching4GMNS time cost: %.6f seconds' % (end - start))
-#     print("The output data is generated!")
+    # choose mode
+    mode = 0
+
+    start = time.time()
+    _optimal_MapMatching4GMNS_CAPI(mode)
+    end = time.time()
+
+    print('MapMatching4GMNS time cost: %.6f seconds' % (end - start))
+    print("The output data is generated!")
