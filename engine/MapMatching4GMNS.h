@@ -9,6 +9,6 @@
 #define MAPMATCHING4GMNS_ENGINE_API
 #endif
 
-extern "C" MAPMATCHING4GMNS_ENGINE_API  double MapMatching4GMNS();
+extern "C" MAPMATCHING4GMNS_ENGINE_API void MapMatching4GMNS(const int mode);
 
 #endif
